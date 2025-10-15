@@ -82,20 +82,33 @@ def get_species_bills(penguins, species):
 
 def average_bill_length(penguins):
     """
-    Calculates the average bill length of each species.
-    Example output:
-    {'Adelie': 38.5, 'Gentoo': 47.2, 'Chinstrap': 48.8}
+    Calculates the average bill length of each species,
+    handling NA or invalid bill length values gracefully.
     """
     species_set = set(p["species"] for p in penguins)
     averages = {}
+
     for s in species_set:
-        bills = get_species_bills(penguins, s)
-        if bills:
-            averages[s] = sum(bills) / len(bills)
+        valid_bills = []
+        for p in penguins:
+            if p["species"] == s:
+                val = p["bill_length_mm"]
+                # Filter out None, 'NA', or other invalid values
+                if isinstance(val, (int, float)):
+                    valid_bills.append(val)
+                else:
+                    # Try to parse if it's a numeric string
+                    try:
+                        valid_bills.append(float(val))
+                    except (ValueError, TypeError):
+                        continue
+
+        if valid_bills:
+            averages[s] = sum(valid_bills) / len(valid_bills)
         else:
             averages[s] = 0
-    return averages
 
+    return averages
 
 def generate_report(proportions, average_bills, filename="penguin_report.txt"):
     """
@@ -121,6 +134,11 @@ def generate_report(proportions, average_bills, filename="penguin_report.txt"):
     print(f"Report generated and saved to: {full_path}")
 
 class TestPenguinFunctions(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # File to be cleaned up after tests
+        cls.test_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), "test_penguin_report.txt")
+
     def setUp(self):
         # General sample
         self.sample_penguins = [
@@ -130,14 +148,20 @@ class TestPenguinFunctions(unittest.TestCase):
             {"species": "Chinstrap", "island": "Dream", "bill_length_mm": 48.0},
         ]
 
-        # Sample with NA (simulate missing bill_length_mm values)
+        # Sample with NA
         self.sample_with_na = [
             {"species": "Adelie", "island": "Torgersen", "bill_length_mm": "NA"},
             {"species": "Adelie", "island": "Torgersen", "bill_length_mm": None},
             {"species": "Gentoo", "island": "Biscoe", "bill_length_mm": 47.0},
         ]
 
-    #  get_island_species 
+        # Sample with string number values
+        self.sample_with_str_numbers = [
+            {"species": "Gentoo", "island": "Biscoe", "bill_length_mm": "48.5"},
+            {"species": "Gentoo", "island": "Biscoe", "bill_length_mm": 47.5},
+        ]
+
+    # ----------------- get_island_species -----------------
     def test_get_island_species_general(self):
         self.assertEqual(get_island_species(self.sample_penguins, "Torgersen"), {"Adelie": 2})
         self.assertEqual(get_island_species(self.sample_penguins, "Biscoe"), {"Gentoo": 1})
@@ -146,7 +170,7 @@ class TestPenguinFunctions(unittest.TestCase):
         self.assertEqual(get_island_species([], "Torgersen"), {})
         self.assertEqual(get_island_species(self.sample_penguins, "Nonexistent"), {})
 
-    #  islands_proportions 
+    # ----------------- islands_proportions -----------------
     def test_islands_proportions_general(self):
         props = islands_proportions(self.sample_penguins)
         self.assertAlmostEqual(props["Torgersen"]["Adelie"], 1.0)
@@ -156,7 +180,7 @@ class TestPenguinFunctions(unittest.TestCase):
         self.assertEqual(islands_proportions([]), {})
         self.assertNotIn("Dream", islands_proportions([{"species": "Adelie", "island": "Torgersen", "bill_length_mm": 40.0}]))
 
-    #  get_species_bills 
+    # ----------------- get_species_bills -----------------
     def test_get_species_bills_general(self):
         self.assertEqual(get_species_bills(self.sample_penguins, "Adelie"), [40.0, 38.0])
         self.assertEqual(get_species_bills(self.sample_penguins, "Gentoo"), [47.0])
@@ -166,7 +190,7 @@ class TestPenguinFunctions(unittest.TestCase):
         bad_data = self.sample_penguins + [{"species": "Adelie", "island": "Torgersen", "bill_length_mm": None}]
         self.assertEqual(get_species_bills(bad_data, "Adelie"), [40.0, 38.0])
 
-    #  average_bill_length
+    # ----------------- average_bill_length -----------------
     def test_average_bill_length_general(self):
         avg = average_bill_length(self.sample_penguins)
         self.assertAlmostEqual(avg["Adelie"], 39.0)
@@ -177,13 +201,28 @@ class TestPenguinFunctions(unittest.TestCase):
         avg = average_bill_length([{"species": "Adelie", "island": "Torgersen", "bill_length_mm": None}])
         self.assertEqual(avg["Adelie"], 0)
 
-    #  average_bill_length with NA 
     def test_average_bill_length_with_na(self):
         avg = average_bill_length(self.sample_with_na)
-        # Gentoo has one valid value 47.0
         self.assertAlmostEqual(avg["Gentoo"], 47.0)
-        # Adelie has no valid bill length
         self.assertEqual(avg["Adelie"], 0)
+
+    def test_average_bill_length_with_string_numbers(self):
+        avg = average_bill_length(self.sample_with_str_numbers)
+        # (48.5 + 47.5) / 2 = 48.0
+        self.assertAlmostEqual(avg["Gentoo"], 48.0)
+
+    # ----------------- generate_report -----------------
+    def test_generate_report_creates_file(self):
+        test_props = {"Torgersen": {"Adelie": 1.0}}
+        test_avgs = {"Adelie": 39.0}
+        generate_report(test_props, test_avgs, filename="test_penguin_report.txt")
+        self.assertTrue(os.path.exists(self.test_file))
+
+    @classmethod
+    def tearDownClass(cls):
+        # Clean up the test file after all tests
+        if os.path.exists(cls.test_file):
+            os.remove(cls.test_file)
 
 
 def run_tests():
@@ -191,6 +230,7 @@ def run_tests():
     Runs all unit tests for the penguin analysis functions.
     """
     unittest.main(exit=False)
+
 
 
 def main():
