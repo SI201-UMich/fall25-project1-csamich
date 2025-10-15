@@ -8,6 +8,7 @@
 
 import csv
 import os
+import unittest
 from collections import defaultdict
 
 def load_penguins(csv_file):
@@ -170,6 +171,9 @@ def run_tests():
     print("All tests passed!")
 
 def main():
+    
+    run_tests()
+    
     # Step 1: Load data
     penguins = load_penguins("penguins.csv")
 
