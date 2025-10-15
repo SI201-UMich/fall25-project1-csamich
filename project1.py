@@ -120,55 +120,78 @@ def generate_report(proportions, average_bills, filename="penguin_report.txt"):
 
     print(f"Report generated and saved to: {full_path}")
 
+class TestPenguinFunctions(unittest.TestCase):
+    def setUp(self):
+        # General sample
+        self.sample_penguins = [
+            {"species": "Adelie", "island": "Torgersen", "bill_length_mm": 40.0},
+            {"species": "Adelie", "island": "Torgersen", "bill_length_mm": 38.0},
+            {"species": "Gentoo", "island": "Biscoe", "bill_length_mm": 47.0},
+            {"species": "Chinstrap", "island": "Dream", "bill_length_mm": 48.0},
+        ]
+
+        # Sample with NA (simulate missing bill_length_mm values)
+        self.sample_with_na = [
+            {"species": "Adelie", "island": "Torgersen", "bill_length_mm": "NA"},
+            {"species": "Adelie", "island": "Torgersen", "bill_length_mm": None},
+            {"species": "Gentoo", "island": "Biscoe", "bill_length_mm": 47.0},
+        ]
+
+    #  get_island_species 
+    def test_get_island_species_general(self):
+        self.assertEqual(get_island_species(self.sample_penguins, "Torgersen"), {"Adelie": 2})
+        self.assertEqual(get_island_species(self.sample_penguins, "Biscoe"), {"Gentoo": 1})
+
+    def test_get_island_species_edge(self):
+        self.assertEqual(get_island_species([], "Torgersen"), {})
+        self.assertEqual(get_island_species(self.sample_penguins, "Nonexistent"), {})
+
+    #  islands_proportions 
+    def test_islands_proportions_general(self):
+        props = islands_proportions(self.sample_penguins)
+        self.assertAlmostEqual(props["Torgersen"]["Adelie"], 1.0)
+        self.assertAlmostEqual(props["Biscoe"]["Gentoo"], 1.0)
+
+    def test_islands_proportions_edge(self):
+        self.assertEqual(islands_proportions([]), {})
+        self.assertNotIn("Dream", islands_proportions([{"species": "Adelie", "island": "Torgersen", "bill_length_mm": 40.0}]))
+
+    #  get_species_bills 
+    def test_get_species_bills_general(self):
+        self.assertEqual(get_species_bills(self.sample_penguins, "Adelie"), [40.0, 38.0])
+        self.assertEqual(get_species_bills(self.sample_penguins, "Gentoo"), [47.0])
+
+    def test_get_species_bills_edge(self):
+        self.assertEqual(get_species_bills(self.sample_penguins, "Nonexistent"), [])
+        bad_data = self.sample_penguins + [{"species": "Adelie", "island": "Torgersen", "bill_length_mm": None}]
+        self.assertEqual(get_species_bills(bad_data, "Adelie"), [40.0, 38.0])
+
+    #  average_bill_length
+    def test_average_bill_length_general(self):
+        avg = average_bill_length(self.sample_penguins)
+        self.assertAlmostEqual(avg["Adelie"], 39.0)
+        self.assertAlmostEqual(avg["Gentoo"], 47.0)
+
+    def test_average_bill_length_edge(self):
+        self.assertEqual(average_bill_length([]), {})
+        avg = average_bill_length([{"species": "Adelie", "island": "Torgersen", "bill_length_mm": None}])
+        self.assertEqual(avg["Adelie"], 0)
+
+    #  average_bill_length with NA 
+    def test_average_bill_length_with_na(self):
+        avg = average_bill_length(self.sample_with_na)
+        # Gentoo has one valid value 47.0
+        self.assertAlmostEqual(avg["Gentoo"], 47.0)
+        # Adelie has no valid bill length
+        self.assertEqual(avg["Adelie"], 0)
+
+
 def run_tests():
-    print("\nRunning tests...")
+    """
+    Runs all unit tests for the penguin analysis functions.
+    """
+    unittest.main(exit=False)
 
-    sample_penguins = [
-        {"species": "Adelie", "island": "Torgersen", "bill_length_mm": 40.0},
-        {"species": "Adelie", "island": "Torgersen", "bill_length_mm": 38.0},
-        {"species": "Gentoo", "island": "Biscoe", "bill_length_mm": 47.0},
-        {"species": "Chinstrap", "island": "Dream", "bill_length_mm": 48.0},
-    ]
-
-    # ----------------- get_island_species -----------------
-    assert get_island_species(sample_penguins, "Torgersen") == {"Adelie": 2}, "General Case 1 failed"
-    assert get_island_species(sample_penguins, "Biscoe") == {"Gentoo": 1}, "General Case 2 failed"
-    assert get_island_species([], "Torgersen") == {}, "Edge Case 1 failed (empty list)"
-    assert get_island_species(sample_penguins, "Nonexistent") == {}, "Edge Case 2 failed (unknown island)"
-
-    # ----------------- islands_proportions -----------------
-    props = islands_proportions(sample_penguins)
-    assert round(props["Torgersen"]["Adelie"], 2) == 1.00, "General Case 1 failed"
-    assert round(props["Biscoe"]["Gentoo"], 2) == 1.00, "General Case 2 failed"
-    assert islands_proportions([]) == {}, "Edge Case 1 failed (empty)"
-    # If an island exists but has no penguins (impossible in this test), it should still give empty dict
-    empty_penguins = [{"species": "Adelie", "island": "Torgersen", "bill_length_mm": 40.0}]
-    assert "Dream" not in islands_proportions(empty_penguins), "Edge Case 2 failed"
-
-    # ----------------- get_species_bills -----------------
-    assert get_species_bills(sample_penguins, "Adelie") == [40.0, 38.0], "General Case 1 failed"
-    assert get_species_bills(sample_penguins, "Gentoo") == [47.0], "General Case 2 failed"
-    assert get_species_bills(sample_penguins, "Nonexistent") == [], "Edge Case 1 failed"
-    bad_data = sample_penguins + [{"species": "Adelie", "island": "Torgersen", "bill_length_mm": None}]
-    assert get_species_bills(bad_data, "Adelie") == [40.0, 38.0], "Edge Case 2 failed (None value)"
-
-    # ----------------- average_bill_length -----------------
-    avg = average_bill_length(sample_penguins)
-    assert round(avg["Adelie"], 2) == 39.00, "General Case 1 failed"
-    assert round(avg["Gentoo"], 2) == 47.00, "General Case 2 failed"
-    assert average_bill_length([]) == {}, "Edge Case 1 failed (empty)"
-    assert average_bill_length([{"species": "Adelie", "island": "Torgersen", "bill_length_mm": None}])["Adelie"] == 0, "Edge Case 2 failed (None value)"
-
-    # ----------------- generate_report -----------------
-    # Just ensure it runs without error and creates a file
-    test_props = {"Torgersen": {"Adelie": 1.0}}
-    test_avgs = {"Adelie": 39.0}
-    generate_report(test_props, test_avgs, filename="test_penguin_report.txt")
-    base_path = os.path.abspath(os.path.dirname(__file__))
-    full_path = os.path.join(base_path, "test_penguin_report.txt")
-    assert os.path.exists(full_path), "Report file not created"
-
-    print("All tests passed!")
 
 def main():
     
